@@ -14,15 +14,17 @@
 #include <sys/conf.h>   /* cdevsw struct */
 #include <sys/uio.h>    /* uio struct */
 #include <sys/malloc.h>
-
+#include <sys/poll.h>
 #include <sys/device.h>
 #define BUFFERSIZE 255
 
 /* Function prototypes */
-static d_open_t      echo_open;
-static d_close_t     echo_close;
-static d_read_t      echo_read;
-static d_write_t     echo_write;
+static d_open_t     echo_open;
+static d_close_t    echo_close;
+static d_read_t     echo_read;
+static d_write_t    echo_write;
+static d_kqfilter_t	echo_kqfilter;
+
 
 /* Character device entry points */
 static struct dev_ops echo_cdevsw = {
@@ -31,6 +33,7 @@ static struct dev_ops echo_cdevsw = {
 		.d_close = echo_close,
 		.d_read = echo_read,
 		.d_write = echo_write,
+		.d_kqfilter = echo_kqfilter,
 };
 
 
@@ -156,6 +159,82 @@ echo_write(struct dev_write_args* t)
 	if (error != 0)
 		uprintf("Write failed: bad address!\n");
 	return (error);
+}
+static void filt_echodetach(struct knote *kn);
+static int filt_echoread(struct knote *kn, long hint);
+static int filt_echowrite(struct knote *kn, long hint);
+
+static struct filterops echoread_filtops =
+	{ FILTEROP_ISFD ,
+	  NULL, filt_echodetach, filt_echoread };
+
+static struct filterops echowrite_filtops =
+	{ FILTEROP_ISFD ,
+	  NULL, filt_echodetach, filt_echowrite };
+
+static int
+echo_kqfilter(struct dev_kqfilter_args *t)
+{
+	struct knote *kn = t->a_kn;
+
+	t->a_result = 0;
+
+	switch (kn->kn_filter) {
+	case EVFILT_READ:
+		kn->kn_fop = &echoread_filtops;
+		break;
+	case EVFILT_WRITE:
+		kn->kn_fop = &echowrite_filtops;
+		break;
+	default:
+		t->a_result = EOPNOTSUPP;
+		return (0);
+	}
+	kn->kn_hook = (caddr_t)t->a_head.a_dev;
+		
+	return (0);
+}
+
+static void
+filt_echodetach(struct knote *kn) { uprintf("filter gone\n"); }
+
+static int
+filt_echoread(struct knote *kn, long hint)
+{
+	cdev_t dev = (cdev_t)kn->kn_hook;
+	int revents = 0;
+
+	if(kn->kn_sfflags & NOTE_OLDAPI)
+	{
+		if (seltrue(dev, POLLIN | POLLRDNORM)){
+			if (echomsg->len > 0) {
+				revents |= seltrue(dev, POLLIN | POLLRDNORM);
+				uprintf("poll.Have smth\n");
+			}
+			else 
+				uprintf("poll. No deal\n");
+		}
+	}
+	return revents;
+
+
+}
+
+static int
+filt_echowrite(struct knote *kn, long hint)
+{
+	cdev_t dev = (cdev_t)kn->kn_hook;
+	int revents = 0;
+
+	if(kn->kn_sfflags & NOTE_OLDAPI)
+	{
+		if (seltrue(dev,POLLOUT | POLLWRNORM)){
+			revents |= seltrue(dev, POLLOUT | POLLWRNORM);
+			uprintf("poll\n");
+		}
+	}
+	return revents;
+
 }
 
 DEV_MODULE(echo, echo_loader, NULL);

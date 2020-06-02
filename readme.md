@@ -12,4 +12,15 @@ use:
 echo anyth >/dev/echo
 cp /dev/echo /dev/stdout
 ```
-idea and half of code - bsd sample. make_dev dragonfly manpage also has some info
+to check out poll:  
+first build app that makes it
+```
+c++ vegabond.cpp -o t
+```
+  
+`./t`  
+  
+bsd sample ported. make_dev dragonfly manpage has some info 
+
+
+
