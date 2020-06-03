@@ -10,7 +10,7 @@ int main(int,char**)
 	if(f == NULL) { std::cout << "no device" << std::endl; return 0; }
 	pfd[0].fd = fileno(f);
 	pfd[0].events = POLLIN;
-	nready = poll(pfd, 1, 0.5 * 1000);
+	nready = poll(pfd, 1, 15 * 1000);
 
 	if (nready == -1)
 		std::cout << "no poll" << std::endl;

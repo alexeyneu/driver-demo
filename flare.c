@@ -42,12 +42,23 @@ struct s_echo {
 	int len;
 };
 
+/*driver control block */
+struct echo_ff
+{
+	struct kqinfo ffread;
+};
+/* end of driver control block */
+
 /* vars */
 static cdev_t echo_dev;
 static struct s_echo *echomsg;
 
+
 MALLOC_DECLARE(M_ECHOBUF);
 MALLOC_DEFINE(M_ECHOBUF, "echobuffer", "buffer for echo module");
+
+MALLOC_DECLARE(M_ECHODEVICE);
+MALLOC_DEFINE(M_ECHODEVICE, "echodevice", "echo device");
 
 /*
  * This function is called by the kld[un]load(2) system calls to
@@ -57,7 +68,7 @@ static int
 echo_loader(struct module *m __unused, int what, void *arg __unused)
 {
 	int error = 0;
-	
+	struct echo_ff *tr;
 	switch (what) {
 	case MOD_LOAD:                /* kldload */
 		echo_dev = make_dev(&echo_cdevsw,
@@ -69,6 +80,9 @@ echo_loader(struct module *m __unused, int what, void *arg __unused)
 		reference_dev(echo_dev);
 		echomsg = kmalloc(sizeof(*echomsg), M_ECHOBUF, M_WAITOK |
 		    M_ZERO);
+		tr = kmalloc(sizeof(*tr), M_ECHODEVICE, M_WAITOK |
+		    M_ZERO);
+		echo_dev->si_drv1 = tr;
 		uprintf("Echo device loaded.\n");
 		break;
 	case MOD_UNLOAD:
@@ -134,8 +148,11 @@ static int
 echo_write(struct dev_write_args* t)
 {
 	size_t amt;
+	bool ter = 0;
 	int error;
-
+	cdev_t dev = t->a_head.a_dev;
+	struct echo_ff *tr = dev->si_drv1;
+	struct klist *klist = &tr->ffread.ki_note;	
 	/*
 	 * We either write from the beginning or are appending -- do
 	 * not allow random access.
@@ -145,7 +162,10 @@ echo_write(struct dev_write_args* t)
 
 	/* This is a new message, reset length */
 	if (t->a_uio->uio_offset == 0)
+	{
 		echomsg->len = 0;
+		if (t->a_uio->uio_resid != 0) ter = 1;
+	}
 
 	/* Copy the string in from user memory to kernel memory */
 	amt = MIN(t->a_uio->uio_resid, (BUFFERSIZE - echomsg->len));
@@ -155,11 +175,12 @@ echo_write(struct dev_write_args* t)
 	/* Now we need to null terminate and record the length */
 	echomsg->len = t->a_uio->uio_offset;
 	echomsg->msg[echomsg->len] = 0;
-
+	if ( ter == 1) KNOTE(klist ,0);
 	if (error != 0)
 		uprintf("Write failed: bad address!\n");
 	return (error);
 }
+
 static void filt_echodetach(struct knote *kn);
 static int filt_echoread(struct knote *kn, long hint);
 static int filt_echowrite(struct knote *kn, long hint);
@@ -176,6 +197,8 @@ static int
 echo_kqfilter(struct dev_kqfilter_args *t)
 {
 	struct knote *kn = t->a_kn;
+	struct echo_ff *tr = t->a_head.a_dev->si_drv1;
+	struct klist *klist = &tr->ffread.ki_note;
 
 	t->a_result = 0;
 
@@ -191,31 +214,39 @@ echo_kqfilter(struct dev_kqfilter_args *t)
 		return (0);
 	}
 	kn->kn_hook = (caddr_t)t->a_head.a_dev;
-		
+	knote_insert(klist, kn); //among read requests there will be flashes of write ones
+	
 	return (0);
 }
 
 static void
-filt_echodetach(struct knote *kn) { uprintf("filter gone\n"); }
+filt_echodetach(struct knote *kn) 
+{ 
+	cdev_t dev = (cdev_t)kn->kn_hook;
+	struct echo_ff *tr = dev->si_drv1;
+	struct klist *klist = &tr->ffread.ki_note;
+
+	knote_remove(klist, kn);
+	uprintf("filter gone\n"); 
+}
 
 static int
 filt_echoread(struct knote *kn, long hint)
 {
 	cdev_t dev = (cdev_t)kn->kn_hook;
-	int revents = 0;
 
 	if(kn->kn_sfflags & NOTE_OLDAPI)
 	{
 		if (seltrue(dev, POLLIN | POLLRDNORM)){
 			if (echomsg->len > 0) {
-				revents |= seltrue(dev, POLLIN | POLLRDNORM);
 				uprintf("poll.Have smth\n");
+				return 1;
 			}
-			else 
+			else // wait
 				uprintf("poll. No deal\n");
 		}
 	}
-	return revents;
+	return 0;
 
 
 }
@@ -224,16 +255,15 @@ static int
 filt_echowrite(struct knote *kn, long hint)
 {
 	cdev_t dev = (cdev_t)kn->kn_hook;
-	int revents = 0;
 
 	if(kn->kn_sfflags & NOTE_OLDAPI)
 	{
 		if (seltrue(dev,POLLOUT | POLLWRNORM)){
-			revents |= seltrue(dev, POLLOUT | POLLWRNORM);
 			uprintf("poll\n");
+			return 1;
 		}
 	}
-	return revents;
+	return 0;
 
 }
 
