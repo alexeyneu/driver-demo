@@ -87,8 +87,10 @@ echo_loader(struct module *m __unused, int what, void *arg __unused)
 		break;
 	case MOD_UNLOAD:
 	case MOD_SHUTDOWN:
+		tr = echo_dev->si_drv1;
 		destroy_dev(echo_dev);
 		kfree(echomsg, M_ECHOBUF);
+		kfree(tr, M_ECHODEVICE);
 		uprintf("Echo device unloaded.\n");
 		break;
 	default:

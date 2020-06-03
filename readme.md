@@ -20,7 +20,8 @@ c++ vegabond.cpp -o t
   
 `./t`  
   
-bsd sample ported. make_dev dragonfly manpage has some info 
-
-
+bsd sample ported. make_dev dragonfly manpage has some info  
+https://github.com/thesjg/SJG-DragonFly-BSD-SoC/wiki/Locking-strategy  
+  
+https://www.usenix.org/legacy/events/usenix01/freenix01/full_papers/lemon/lemon.pdf
 
