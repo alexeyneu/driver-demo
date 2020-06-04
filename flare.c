@@ -16,6 +16,8 @@
 #include <sys/malloc.h>
 #include <sys/poll.h>
 #include <sys/device.h>
+#include <sys/thread.h>
+
 #define BUFFERSIZE 255
 
 /* Function prototypes */
@@ -199,8 +201,7 @@ static int
 echo_kqfilter(struct dev_kqfilter_args *t)
 {
 	struct knote *kn = t->a_kn;
-	struct echo_ff *tr = t->a_head.a_dev->si_drv1;
-	struct klist *klist = &tr->ffread.ki_note;
+
 
 	t->a_result = 0;
 
@@ -216,7 +217,6 @@ echo_kqfilter(struct dev_kqfilter_args *t)
 		return (0);
 	}
 	kn->kn_hook = (caddr_t)t->a_head.a_dev;
-	knote_insert(klist, kn); //among read requests there will be flashes of write ones
 	
 	return (0);
 }
@@ -227,15 +227,24 @@ filt_echodetach(struct knote *kn)
 	cdev_t dev = (cdev_t)kn->kn_hook;
 	struct echo_ff *tr = dev->si_drv1;
 	struct klist *klist = &tr->ffread.ki_note;
+	struct knote *kn_b = NULL;
 
-	knote_remove(klist, kn);
+lwkt_getpooltoken(klist);
+	if( !SLIST_EMPTY(klist) ) 
+		SLIST_FOREACH(kn_b, klist, kn_next)
+			if( kn_b == kn) break;
+	if( kn_b == kn ) knote_remove(klist, kn);
+lwkt_relpooltoken(klist);
+
 	uprintf("filter gone\n"); 
 }
 
 static int
 filt_echoread(struct knote *kn, long hint)
 {
-	cdev_t dev = (cdev_t)kn->kn_hook;
+	cdev_t dev = (cdev_t)kn->kn_hook;	
+	struct echo_ff *tr = dev->si_drv1;
+	struct klist *klist = &tr->ffread.ki_note;
 
 	if(kn->kn_sfflags & NOTE_OLDAPI)
 	{
@@ -244,8 +253,13 @@ filt_echoread(struct knote *kn, long hint)
 				uprintf("poll.Have smth\n");
 				return 1;
 			}
-			else // wait
+			else { // wait
+				lwkt_getpooltoken(klist);
+				knote_insert(klist, kn);
+				lwkt_relpooltoken(klist);
+				
 				uprintf("poll. No deal\n");
+			}
 		}
 	}
 	return 0;
