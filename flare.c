@@ -268,15 +268,12 @@ filt_echoread(struct knote *kn, long hint)
 static int
 filt_echowrite(struct knote *kn, long hint)
 {
-	cdev_t dev = (cdev_t)kn->kn_hook;
-
 	if(kn->kn_sfflags & NOTE_OLDAPI)
 	{
 		uprintf("poll\n");
 		return 1;
 	}
 	return 0;
-
 }
 
 DEV_MODULE(echo, echo_loader, NULL);
