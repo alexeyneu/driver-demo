@@ -229,12 +229,12 @@ filt_echodetach(struct knote *kn)
 	struct klist *klist = &tr->ffread.ki_note;
 	struct knote *kn_b = NULL;
 
-lwkt_getpooltoken(klist);
+	lwkt_getpooltoken(klist);
 	if( !SLIST_EMPTY(klist) ) 
 		SLIST_FOREACH(kn_b, klist, kn_next)
 			if( kn_b == kn) break;
 	if( kn_b == kn ) knote_remove(klist, kn);
-lwkt_relpooltoken(klist);
+	lwkt_relpooltoken(klist);
 
 	uprintf("filter gone\n"); 
 }
@@ -248,18 +248,16 @@ filt_echoread(struct knote *kn, long hint)
 
 	if(kn->kn_sfflags & NOTE_OLDAPI)
 	{
-		if (seltrue(dev, POLLIN | POLLRDNORM)){
-			if (echomsg->len > 0) {
-				uprintf("poll.Have smth\n");
-				return 1;
-			}
-			else { // wait
-				lwkt_getpooltoken(klist);
-				knote_insert(klist, kn);
-				lwkt_relpooltoken(klist);
-				
-				uprintf("poll. No deal\n");
-			}
+		if (echomsg->len > 0) {
+			uprintf("poll.Have smth\n");
+			return 1;
+		}
+		else { // wait
+			lwkt_getpooltoken(klist);
+			knote_insert(klist, kn);
+			lwkt_relpooltoken(klist);
+			
+			uprintf("poll. No deal\n");
 		}
 	}
 	return 0;
@@ -274,10 +272,8 @@ filt_echowrite(struct knote *kn, long hint)
 
 	if(kn->kn_sfflags & NOTE_OLDAPI)
 	{
-		if (seltrue(dev,POLLOUT | POLLWRNORM)){
-			uprintf("poll\n");
-			return 1;
-		}
+		uprintf("poll\n");
+		return 1;
 	}
 	return 0;
 
