@@ -17,7 +17,7 @@
 #include <sys/poll.h>
 #include <sys/device.h>
 #include <sys/thread.h>
-
+#include <sys/thread2.h>
 #define BUFFERSIZE 255
 
 /* Function prototypes */
@@ -201,8 +201,6 @@ static int
 echo_kqfilter(struct dev_kqfilter_args *t)
 {
 	struct knote *kn = t->a_kn;
-
-
 	t->a_result = 0;
 
 	switch (kn->kn_filter) {
@@ -228,14 +226,15 @@ filt_echodetach(struct knote *kn)
 	struct echo_ff *tr = dev->si_drv1;
 	struct klist *klist = &tr->ffread.ki_note;
 	struct knote *kn_b = NULL;
-
+	
+	bool k = LWKT_TOKEN_HELD_ANY(lwkt_token_pool_lookup(klist));
+	if (k == false) uprintf("filter detach ... dont have a token for now\n"); 
 	lwkt_getpooltoken(klist);
 	if( !SLIST_EMPTY(klist) ) 
 		SLIST_FOREACH(kn_b, klist, kn_next)
 			if( kn_b == kn) break;
 	if( kn_b == kn ) knote_remove(klist, kn);
 	lwkt_relpooltoken(klist);
-
 	uprintf("filter gone\n"); 
 }
 
