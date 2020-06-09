@@ -225,16 +225,22 @@ filt_echodetach(struct knote *kn)
 	cdev_t dev = (cdev_t)kn->kn_hook;
 	struct echo_ff *tr = dev->si_drv1;
 	struct klist *klist = &tr->ffread.ki_note;
+	struct kqueue *kq = kn->kn_kq;
 	struct knote *kn_b = NULL;
 	
-	bool k = LWKT_TOKEN_HELD_ANY(lwkt_token_pool_lookup(klist));
-	if (k == false) uprintf("filter detach ... dont have a token for now\n"); 
+	bool k = LWKT_TOKEN_HELD_ANY(lwkt_token_pool_lookup(kq));
+	if (k == false) uprintf("filter detach ... dont have a token for now\n");
+	else 
+		 uprintf("filter detach ... already have kqueue token\n");
+	if ((kn->kn_status & KN_PROCESSING) == 0) uprintf("filter detach ... now there's no processing flag on knote\n");
+	else
+		 uprintf("filter detach ... already have processing flag on knote\n");
 	lwkt_getpooltoken(klist);
 	if( !SLIST_EMPTY(klist) ) 
 		SLIST_FOREACH(kn_b, klist, kn_next)
 			if( kn_b == kn) break;
-	if( kn_b == kn ) knote_remove(klist, kn);
 	lwkt_relpooltoken(klist);
+	if( kn_b == kn ) knote_remove(klist, kn); //goes without klist token, only with kq one (?)
 	uprintf("filter gone\n"); 
 }
 
@@ -244,7 +250,7 @@ filt_echoread(struct knote *kn, long hint)
 	cdev_t dev = (cdev_t)kn->kn_hook;	
 	struct echo_ff *tr = dev->si_drv1;
 	struct klist *klist = &tr->ffread.ki_note;
-
+	
 	if(kn->kn_sfflags & NOTE_OLDAPI)
 	{
 		if (echomsg->len > 0) {
@@ -252,16 +258,11 @@ filt_echoread(struct knote *kn, long hint)
 			return 1;
 		}
 		else { // wait
-			lwkt_getpooltoken(klist);
-			knote_insert(klist, kn);
-			lwkt_relpooltoken(klist);
-			
+			knote_insert(klist, kn);			
 			uprintf("poll. No deal\n");
 		}
 	}
 	return 0;
-
-
 }
 
 static int
