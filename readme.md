@@ -9,9 +9,11 @@ unload:
  `kldunload flare`  
 use:  
 ```
-echo anyth >/dev/echo
-cp /dev/echo /dev/stdout
+sudo cp /dev/stdin /dev/echo
+sudo cp /dev/echo /dev/stdout
 ```
+ `ctrl+d` on a new line will end then flush `stdin` stream.
+
 to check out poll:  
 first build app that makes it
 ```
