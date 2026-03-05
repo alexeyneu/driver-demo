@@ -26,4 +26,32 @@ bsd sample ported. make_dev dragonfly manpage has some info
 https://github.com/thesjg/SJG-DragonFly-BSD-SoC/wiki/Locking-strategy  
   
 https://www.usenix.org/legacy/events/usenix01/freenix01/full_papers/lemon/lemon.pdf
+  
+dragonfly os  on vm: 
+install:
+```
+xorg xf86-input-libinput xf86-input-evdev
 
+```
+add:
+```
+dbus_enable="YES"
+hald_enable="YES"
+```
+to `/etc/rc.conf`  
+
+```
+kern.evdev.rcpt_mask=6
+```
+to `/etc/sysctl.conf`  
+
+AND  
+
+```
+Section "InputClass"
+    Identifier "KeyboardDefaults"
+    MatchIsKeyboard "on"
+    Driver "libinput"
+EndSection
+```
+to `/usr/local/etc/X11/xorg.conf.d/10-keyboard.conf`
