@@ -25,8 +25,8 @@ c++ vegabond.cpp -o t
 full throttle:  
   
 two terminals. in first one load `flare.ko` so it's brand new. In second one run `sudo ./t`. Then whithin 15s `sudo cp /dev/stdin /dev/echo
-` in first one.
-  
+` in first one.  
+  ![Screen1](/VirtualBox_hydy_05_03_2026_13_09_46.png)
   
 bsd sample ported. make_dev dragonfly manpage has some info  
 https://github.com/thesjg/SJG-DragonFly-BSD-SoC/wiki/Locking-strategy  
