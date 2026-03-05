@@ -4,6 +4,8 @@
  * Murray Stokely
  * Søren (Xride) Straarup
  * Eitan Adler
+
+ Alex Neudatchin 2020
  */
 
 #include <sys/types.h>
