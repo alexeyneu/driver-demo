@@ -27,7 +27,7 @@ https://github.com/thesjg/SJG-DragonFly-BSD-SoC/wiki/Locking-strategy
   
 https://www.usenix.org/legacy/events/usenix01/freenix01/full_papers/lemon/lemon.pdf
   
-dragonfly os  on vm: 
+dragonfly os  on vm:  
 install:
 ```
 xorg xf86-input-libinput xf86-input-evdev
