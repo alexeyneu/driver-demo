@@ -65,7 +65,7 @@ to `/usr/local/etc/X11/xorg.conf.d/10-keyboard.conf`
   
 access files from host how to:  
   
-make second 2gb hdd in virtualbox on same controller then  
+make second 2gb hdd on same controller then  
 `fdisk -u ad1`  
 make first partition ,`size 1000000` (whatever that means for 500M) , `sysid = 11`  
 `newfs_msdos -F32 /dev/ad1s4`  
