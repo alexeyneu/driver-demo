@@ -4,8 +4,6 @@
  * Murray Stokely
  * Søren (Xride) Straarup
  * Eitan Adler
-
- Alex Neudatchin 2020
  */
 
 #include <sys/types.h>
@@ -50,6 +48,9 @@ struct s_echo {
 struct echo_ff
 {
 	struct kqinfo ffread;
+	struct kqinfo ffwrite_notify;
+	
+
 };
 /* end of driver control block */
 
@@ -108,6 +109,7 @@ echo_loader(struct module *m __unused, int what, void *arg __unused)
 static int echo_open(struct dev_open_args* t)
 {
 	int error = 0;
+//        struct kqinfo *tr = t->a_head.a_dev->si_drv1;
 
 	uprintf("Opened device \"echo\" successfully.\n");
 	return (error);
@@ -131,7 +133,11 @@ static int echo_read(struct dev_read_args* t)
 {
 	size_t amt;
 	int error;
+	cdev_t dev = t->a_head.a_dev;
+	struct echo_ff *tr = dev->si_drv1;
+//	struct klist *klist = &tr->ffread.ki_note;
 
+	struct klist *klist_nt = &tr->ffwrite_notify.ki_note;
 	/*
 	 * How big is this read operation?  Either as big as the user wants,
 	 * or as big as the remaining data.  Note that the 'len' does not
@@ -142,7 +148,9 @@ static int echo_read(struct dev_read_args* t)
 
 	if ((error = uiomove(echomsg->msg, amt, t->a_uio)) != 0)
 		uprintf("uiomove failed!\n");
+	else
 
+ 		KNOTE(klist_nt ,0);
 	return (error);
 }
 
@@ -154,11 +162,13 @@ static int
 echo_write(struct dev_write_args* t)
 {
 	size_t amt;
-	bool ter = 0;
+	bool ter = false;
 	int error;
 	cdev_t dev = t->a_head.a_dev;
 	struct echo_ff *tr = dev->si_drv1;
-	struct klist *klist = &tr->ffread.ki_note;	
+	struct klist *klist = &tr->ffread.ki_note;
+//	struct klist *klist_nt = &tr->ffwrite_notify.ki_note;
+	
 	/*
 	 * We either write from the beginning or are appending -- do
 	 * not allow random access.
@@ -170,7 +180,7 @@ echo_write(struct dev_write_args* t)
 	if (t->a_uio->uio_offset == 0)
 	{
 		echomsg->len = 0;
-		if (t->a_uio->uio_resid != 0) ter = 1;
+		if (t->a_uio->uio_resid != 0) ter = !false;
 	}
 
 	/* Copy the string in from user memory to kernel memory */
@@ -181,7 +191,11 @@ echo_write(struct dev_write_args* t)
 	/* Now we need to null terminate and record the length */
 	echomsg->len = t->a_uio->uio_offset;
 	echomsg->msg[echomsg->len] = 0;
-	if ( ter == 1) KNOTE(klist ,0);
+	if ( ter == !false) {
+		uprintf("Write completed. Sent\n");
+
+		KNOTE(klist ,0);}
+//	KNOTE(klist,0);
 	if (error != 0)
 		uprintf("Write failed: bad address!\n");
 	return (error);
@@ -203,21 +217,32 @@ static int
 echo_kqfilter(struct dev_kqfilter_args *t)
 {
 	struct knote *kn = t->a_kn;
+	cdev_t dev = (cdev_t)kn->kn_hook;
+	struct echo_ff *tr = dev->si_drv1;
+	struct klist *klist = &tr->ffread.ki_note;
+	struct klist *klist_nt = &tr->ffwrite_notify.ki_note;
+
+
 	t->a_result = 0;
 
 	switch (kn->kn_filter) {
 	case EVFILT_READ:
 		kn->kn_fop = &echoread_filtops;
+		kn->kn_hook = (caddr_t)t->a_head.a_dev;
+		knote_insert(klist, kn);	
+
 		break;
 	case EVFILT_WRITE:
 		kn->kn_fop = &echowrite_filtops;
+		kn->kn_hook = (caddr_t)t->a_head.a_dev;
+		knote_insert(klist_nt, kn);	
+
+
 		break;
 	default:
 		t->a_result = EOPNOTSUPP;
 		return (0);
 	}
-	kn->kn_hook = (caddr_t)t->a_head.a_dev;
-	
 	return (0);
 }
 
@@ -227,6 +252,8 @@ filt_echodetach(struct knote *kn)
 	cdev_t dev = (cdev_t)kn->kn_hook;
 	struct echo_ff *tr = dev->si_drv1;
 	struct klist *klist = &tr->ffread.ki_note;
+	struct klist *klist_nt = &tr->ffwrite_notify.ki_note;
+
 	struct kqueue *kq = kn->kn_kq;
 	struct knote *kn_b = NULL;
 	
@@ -243,6 +270,14 @@ filt_echodetach(struct knote *kn)
 			if( kn_b == kn) break;
 	lwkt_relpooltoken(klist);
 	if( kn_b == kn ) knote_remove(klist, kn); //goes without klist token, only with kq one (?)
+	kn_b = NULL;
+	lwkt_getpooltoken(klist_nt);
+	if( !SLIST_EMPTY(klist_nt) ) 
+		SLIST_FOREACH(kn_b, klist_nt, kn_next)
+			if( kn_b == kn) break;
+	lwkt_relpooltoken(klist_nt);
+	if( kn_b == kn ) knote_remove(klist_nt, kn); //goes without klist token, only with kq one (?)
+		
 	uprintf("filter gone\n"); 
 }
 
@@ -272,8 +307,8 @@ filt_echowrite(struct knote *kn, long hint)
 {
 	if(kn->kn_sfflags & NOTE_OLDAPI)
 	{
-		uprintf("poll\n");
-		return 1;
+		uprintf("write_op performing\n");
+		return 0;
 	}
 	return 0;
 }
