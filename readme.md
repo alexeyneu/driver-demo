@@ -62,3 +62,17 @@ Section "InputClass"
 EndSection
 ```
 to `/usr/local/etc/X11/xorg.conf.d/10-keyboard.conf`
+  
+access files from host how to:  
+  
+make second 2gb hdd in virtualbox on same controller then  
+`fdisk -u ad1`  
+make first partition ,`size 1000000` (whatever that means for 500M) , `sysid = 11`  
+`newfs_msdos -F32 /dev/ad1s4`  
+
+```
+mkdir f
+mmount_msdos ad1s4 ./f
+```
+  
+then to access it from linux  you need to open `.vdi` . 7zip  can do it . for 24.04+ linux there's no gui in stores but there's one in the wild (it's standalone archiver with own name).   
