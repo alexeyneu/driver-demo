@@ -72,7 +72,7 @@ make first partition ,`size 1000000` (whatever that means for 500M) , `sysid = 1
 
 ```
 mkdir f
-mmount_msdos ad1s4 ./f
+mount_msdos ad1s4 ./f
 ```
   
 then to access it from linux  you need to open `.vdi` . 7zip  can do it . for 24.04+ linux there's no gui in stores but there's one in the wild (it's standalone archiver with own name).   
